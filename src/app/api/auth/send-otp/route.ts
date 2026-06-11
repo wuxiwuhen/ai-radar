@@ -29,6 +29,6 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: "验证码已发送到您的邮箱",
+    message: "登录链接已发送到您的邮箱",
   });
 }

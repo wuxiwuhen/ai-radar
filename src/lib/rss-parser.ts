@@ -1,15 +1,30 @@
 import { FeedItem } from "./types";
 import { RSS_SOURCES, RSSSource } from "./rss-sources";
 
+// Decode HTML entities without external dependency
+function decodeHTMLEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 // Simple RSS/Atom XML parser (no external dependency needed)
 function extractText(xml: string, tag: string): string {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i");
   const match = xml.match(regex);
   if (!match) return "";
-  return match[1]
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .trim();
+  return decodeHTMLEntities(
+    match[1]
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+      .replace(/<[^>]+>/g, "")
+  ).trim();
 }
 
 function extractAttr(xml: string, tag: string, attr: string): string {
@@ -34,12 +49,18 @@ function parseRSSItems(xml: string, source: RSSSource): FeedItem[] {
 
     if (!title) continue;
 
+    // Strip any residual HTML tags from description/content (after entity decoding)
+    const cleanDesc = description.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const cleanContent = content.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+    const hash = Buffer.from(`${source.id}-${title}-${link}`).toString("base64url").slice(0, 32);
+
     items.push({
-      id: `${source.id}-${Buffer.from(title).toString("base64").slice(0, 20)}`,
+      id: hash,
       title,
       link,
-      description: description.slice(0, 300),
-      content: content.slice(0, 1000),
+      description: cleanDesc.slice(0, 300),
+      content: cleanContent.slice(0, 1000),
       pubDate: pubDate || new Date().toISOString(),
       source: {
         id: source.id,
@@ -47,7 +68,7 @@ function parseRSSItems(xml: string, source: RSSSource): FeedItem[] {
         icon: source.icon,
         category: source.category,
       },
-      tags: extractTags(title + " " + description),
+      tags: extractTags(title + " " + cleanDesc),
       heatScore: calculateHeatScore(pubDate),
     });
   }
@@ -73,12 +94,18 @@ function parseAtomEntries(xml: string, source: RSSSource): FeedItem[] {
 
     if (!title) continue;
 
+    // Strip any residual HTML tags from summary/content (after entity decoding)
+    const cleanSummary = summary.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const cleanContent = content.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+    const hash = Buffer.from(`${source.id}-${title}-${link}`).toString("base64url").slice(0, 32);
+
     items.push({
-      id: `${source.id}-${Buffer.from(title).toString("base64").slice(0, 20)}`,
+      id: hash,
       title,
       link,
-      description: summary.slice(0, 300),
-      content: content.slice(0, 1000),
+      description: cleanSummary.slice(0, 300),
+      content: cleanContent.slice(0, 1000),
       pubDate: pubDate || new Date().toISOString(),
       source: {
         id: source.id,
@@ -86,7 +113,7 @@ function parseAtomEntries(xml: string, source: RSSSource): FeedItem[] {
         icon: source.icon,
         category: source.category,
       },
-      tags: extractTags(title + " " + summary),
+      tags: extractTags(title + " " + cleanSummary),
       heatScore: calculateHeatScore(pubDate),
     });
   }
@@ -147,10 +174,11 @@ function calculateHeatScore(pubDate: string): number {
 export async function fetchFeed(source: RSSSource): Promise<FeedItem[]> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(source.url, {
       signal: controller.signal,
+      redirect: "follow",
       headers: {
         "User-Agent": "AI-Radar/1.0 RSS Reader",
         Accept: "application/rss+xml, application/xml, text/xml, application/atom+xml",
@@ -161,7 +189,7 @@ export async function fetchFeed(source: RSSSource): Promise<FeedItem[]> {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      console.error(`Failed to fetch ${source.name}: ${response.status}`);
+      console.warn(`[RSS] Skip ${source.name}: HTTP ${response.status}`);
       return [];
     }
 
@@ -173,7 +201,7 @@ export async function fetchFeed(source: RSSSource): Promise<FeedItem[]> {
     }
     return parseRSSItems(xml, source);
   } catch (error) {
-    console.error(`Error fetching ${source.name}:`, error);
+    console.warn(`[RSS] Skip ${source.name}: ${error instanceof Error ? error.message : "timeout"}`);
     return [];
   }
 }
