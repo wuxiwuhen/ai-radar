@@ -24,13 +24,13 @@ export default function HotTopicCard({ rank, items }: HotTopicCardProps) {
   })();
 
   return (
-    <div className="flex gap-3 sm:gap-4 py-3">
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       {/* Rank */}
       <div
-        className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold ${
+        className={`shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-xs font-extrabold mt-0.5 ${
           rank <= 3
-            ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
-            : "bg-muted text-muted-foreground"
+            ? "bg-amber-100 text-amber-700"
+            : "bg-tag-bg text-text-muted"
         }`}
       >
         {rank}
@@ -38,48 +38,42 @@ export default function HotTopicCard({ rank, items }: HotTopicCardProps) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm sm:text-base font-semibold text-foreground line-clamp-2 leading-snug">
-          {main.title}
-        </h3>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className="text-xs text-primary font-medium">
+        <h4 className="text-sm font-bold text-text-primary leading-snug line-clamp-1">
+          {main.link ? (
+            <a href={main.link} target="_blank" rel="noopener noreferrer" className="hover:text-accent transition-colors">
+              {main.title}
+            </a>
+          ) : (
+            main.title
+          )}
+        </h4>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          <span className="text-[11px] text-accent font-medium">
             {sourceCount} 个信源
           </span>
-          <span className="text-xs text-muted-foreground">·</span>
-          <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          <span className="text-[10px] text-text-muted opacity-40">·</span>
+          <span className="text-[11px] text-text-muted">{timeAgo}</span>
         </div>
 
-        {/* Source icons (show first 5) */}
-        <div className="flex items-center gap-1 mt-2 flex-wrap">
-          {items.slice(0, 5).map((item) => (
+        {/* Source chips */}
+        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+          {items.slice(0, 4).map((item) => (
             <span
               key={item.source.id}
-              className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground"
+              className="text-[10px] bg-tag-bg text-tag-text px-1.5 py-0.5 rounded"
             >
               {item.source.icon} {item.source.name}
             </span>
           ))}
-          {sourceCount > 5 && (
-            <span className="text-xs text-muted-foreground">
-              +{sourceCount - 5}
-            </span>
+          {sourceCount > 4 && (
+            <span className="text-[10px] text-text-muted">+{sourceCount - 4}</span>
           )}
         </div>
       </div>
 
-      {/* Score badge */}
+      {/* Score */}
       <div className="shrink-0">
-        <span
-          className={`text-xs font-bold px-2 py-1 rounded-lg ${
-            maxScore >= 80
-              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              : maxScore >= 60
-              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          ★ {maxScore}
-        </span>
+        <span className="text-[11px] font-extrabold text-score">{maxScore}</span>
       </div>
     </div>
   );

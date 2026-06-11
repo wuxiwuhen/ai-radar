@@ -1,23 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { Search, User, LogOut, X } from "lucide-react";
+import { Search, LogOut, X, Bookmark, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface NavbarProps {
   user: { email: string } | null;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  currentView: "home" | "favorites";
+  onViewChange: (view: "home" | "favorites") => void;
 }
 
-export default function Navbar({ user }: NavbarProps) {
+export default function Navbar({
+  user,
+  searchQuery,
+  onSearchChange,
+  currentView,
+  onViewChange,
+}: NavbarProps) {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [sent, setSent] = useState(false);
 
-  const handleSendOTP = async () => {
+  const handleSendMagicLink = async () => {
     setLoading(true);
     setError("");
     try {
@@ -28,31 +36,9 @@ export default function Navbar({ user }: NavbarProps) {
       });
       const data = await res.json();
       if (data.success) {
-        setStep("otp");
+        setSent(true);
       } else {
         setError(data.error || "发送失败");
-      }
-    } catch {
-      setError("网络错误，请重试");
-    }
-    setLoading(false);
-  };
-
-  const handleVerifyOTP = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, token: otp }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setShowAuthModal(false);
-        window.location.reload();
-      } else {
-        setError(data.error || "验证失败");
       }
     } catch {
       setError("网络错误，请重试");
@@ -68,51 +54,73 @@ export default function Navbar({ user }: NavbarProps) {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-2xl">📡</span>
-            <h1 className="text-lg font-bold text-foreground">
-              AI Radar
-            </h1>
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
+          {/* Brand */}
+          <button onClick={() => onViewChange("home")} className="flex items-center gap-2 shrink-0">
+            <Zap className="w-5 h-5 text-accent" />
+            <span className="font-bold text-sm tracking-tight">AI Radar</span>
+          </button>
+
+          {/* Nav tabs */}
+          <div className="flex items-center gap-0.5 rounded-full px-1 py-0.5" style={{ background: "var(--tag-bg)" }}>
+            <button
+              onClick={() => onViewChange("home")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                currentView === "home"
+                  ? "bg-accent-bg text-accent-text"
+                  : "text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              精选
+            </button>
+            {user && (
+              <button
+                onClick={() => onViewChange("favorites")}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  currentView === "favorites"
+                    ? "bg-accent-bg text-accent-text"
+                    : "text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                <Bookmark className="w-3 h-3" />
+                收藏
+              </button>
+            )}
           </div>
 
           {/* Search */}
-          <div className="flex-1 max-w-md hidden sm:block">
+          <div className="flex-1 max-w-xs">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
               <input
                 type="text"
-                placeholder="搜索 AI 动态..."
+                placeholder="搜索标题/摘要…"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-lg bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[var(--tag-bg)] text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30"
               />
             </div>
           </div>
 
           {/* Auth */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="shrink-0">
             {user ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground hidden md:block">
-                  {user.email}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">退出</span>
-                </button>
-              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             ) : (
               <button
-                onClick={() => setShowAuthModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  setShowAuthModal(true);
+                  setSent(false);
+                  setError("");
+                }}
+                className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90"
               >
-                <User className="w-4 h-4" />
                 登录
               </button>
             )}
@@ -122,82 +130,50 @@ export default function Navbar({ user }: NavbarProps) {
 
       {/* Auth Modal */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm mx-4 bg-card rounded-2xl border border-border p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">
-                {step === "email" ? "邮箱登录" : "输入验证码"}
-              </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-text-primary">邮箱登录</h2>
               <button
-                onClick={() => {
-                  setShowAuthModal(false);
-                  setStep("email");
-                  setOtp("");
-                  setError("");
-                }}
-                className="p-1 rounded-lg hover:bg-muted transition-colors"
+                onClick={() => { setShowAuthModal(false); setSent(false); setError(""); }}
+                className="p-1 rounded-lg hover:bg-[var(--tag-bg)]"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 text-text-muted" />
               </button>
             </div>
 
-            {step === "email" ? (
+            {!sent ? (
               <>
-                <p className="text-sm text-muted-foreground mb-4">
-                  输入您的邮箱，我们将发送一个 6 位验证码到您的邮箱
+                <p className="text-xs text-text-muted mb-4">
+                  输入您的邮箱，我们将发送一个登录链接
                 </p>
                 <input
                   type="email"
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary mb-4"
-                  onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--tag-bg)] border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 mb-3"
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMagicLink()}
                 />
                 <button
-                  onClick={handleSendOTP}
+                  onClick={handleSendMagicLink}
                   disabled={loading || !email}
-                  className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
                 >
-                  {loading ? "发送中..." : "发送验证码"}
+                  {loading ? "发送中..." : "发送登录链接"}
                 </button>
               </>
             ) : (
-              <>
-                <p className="text-sm text-muted-foreground mb-4">
-                  验证码已发送到 <strong>{email}</strong>
-                </p>
-                <input
-                  type="text"
-                  placeholder="输入 6 位验证码"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.slice(0, 6))}
-                  className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-center text-2xl tracking-[0.5em] text-foreground placeholder:text-muted-foreground placeholder:text-sm placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary mb-4"
-                  onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
-                  autoFocus
-                />
-                <button
-                  onClick={handleVerifyOTP}
-                  disabled={loading || otp.length < 6}
-                  className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                >
-                  {loading ? "验证中..." : "验证登录"}
-                </button>
-                <button
-                  onClick={() => {
-                    setStep("email");
-                    setOtp("");
-                    setError("");
-                  }}
-                  className="w-full mt-2 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  重新输入邮箱
-                </button>
-              </>
+              <div className="text-center py-4">
+                <span className="text-3xl block mb-3">📧</span>
+                <p className="text-xs text-text-muted mb-1">登录链接已发送到</p>
+                <p className="text-sm font-medium text-text-primary mb-3">{email}</p>
+                <p className="text-xs text-text-muted">请查看邮箱并点击登录链接</p>
+              </div>
             )}
 
             {error && (
-              <p className="mt-3 text-sm text-red-500 text-center">{error}</p>
+              <p className="mt-2 text-xs text-red-500 text-center">{error}</p>
             )}
           </div>
         </div>
